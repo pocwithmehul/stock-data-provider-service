@@ -16,5 +16,5 @@ datadog:
 tokenAuthorization:
   validIssuers:
     - login.myorg.com
-  validAudience:
+  validAudiences:
     - myorgstockapp
