@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/pocwithmehul/common-go-lib"
+	commonlogger "github.com/pocwithmehul/common-go-lib/pkg/logger"
+	"github.com/pocwithmehul/stock-data-provider-service/internal/config"
 	"github.com/segmentio/kafka-go"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func NewKafkaReader(cfg *commonlib.Config) *kafka.Reader {
+func NewKafkaReader(cfg *config.Config) *kafka.Reader {
 	return kafka.NewReader(kafka.ReaderConfig{
 		Brokers:     cfg.Kafka.Brokers,
 		Topic:       cfg.Kafka.Topic,
@@ -22,7 +23,7 @@ func NewKafkaReader(cfg *commonlib.Config) *kafka.Reader {
 	})
 }
 
-func ConsumeStockEvents(reader *kafka.Reader, collection *mongo.Collection, logger *commonlib.Logger) {
+func ConsumeStockEvents(reader *kafka.Reader, collection *mongo.Collection, logger *commonlogger.Logger) {
 	for {
 		msg, err := reader.ReadMessage(context.Background())
 		if err != nil {

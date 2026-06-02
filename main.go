@@ -8,31 +8,33 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/pocwithmehul/common-go-lib"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	commonlogger "github.com/pocwithmehul/common-go-lib/pkg/logger"
+	"github.com/pocwithmehul/stock-data-provider-service/internal/config"
+	"github.com/pocwithmehul/stock-data-provider-service/internal/db"
+	"github.com/pocwithmehul/stock-data-provider-service/internal/handler"
+	"github.com/pocwithmehul/stock-data-provider-service/internal/messaging"
 )
 
 func main() {
-	cfg, err := commonlib.LoadConfig()
+	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
 
-	logger := commonlib.NewLogger("stock-data-provider-service", cfg.Datadog)
-	mongoClient, err := mongo.Connect(context.Background(), options.Client().ApplyURI(cfg.Mongo.URI))
+	logger := commonlogger.NewLogger("stock-data-provider-service", cfg.Datadog)
+	mongoClient, err := db.ConnectMongo(context.Background(), cfg.Mongo.URI, cfg.Mongo.Database)
 	if err != nil {
 		logger.Error("mongo connect failed", map[string]interface{}{"error": err.Error()})
 		log.Fatalf("mongo connect: %v", err)
 	}
 
-	collection := mongoClient.Database(cfg.Mongo.Database).Collection(cfg.Mongo.Collection)
-	reader := NewKafkaReader(cfg)
+	collection := mongoClient.GetCollection(cfg.Mongo.Collection)
+	reader := messaging.NewKafkaReader(cfg)
 
-	go ConsumeStockEvents(reader, collection, logger)
+	go messaging.ConsumeStockEvents(reader, collection, logger)
 
 	router := mux.NewRouter()
-	router.HandleFunc("/v1/getstock", GetStockHandler(collection, cfg, logger)).Methods(http.MethodGet)
+	router.HandleFunc("/v1/getstock", handler.GetStockHandler(collection, cfg, logger)).Methods(http.MethodGet)
 
 	port := cfg.Server.Port
 	if port == 0 {
