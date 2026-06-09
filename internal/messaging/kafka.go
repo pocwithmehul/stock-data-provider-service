@@ -5,45 +5,46 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/IBM/sarama"
+	commonkafka "github.com/pocwithmehul/common-go-lib/pkg/kafka"
 	commonlogger "github.com/pocwithmehul/common-go-lib/pkg/logger"
 	"github.com/pocwithmehul/stock-data-provider-service/internal/config"
-	"github.com/segmentio/kafka-go"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func NewKafkaReader(cfg *config.Config) *kafka.Reader {
-	return kafka.NewReader(kafka.ReaderConfig{
-		Brokers:     cfg.Kafka.Brokers,
-		Topic:       cfg.Kafka.Topic,
-		GroupID:     cfg.Kafka.GroupID,
-		MinBytes:    1,
-		MaxBytes:    10e6,
-		StartOffset: kafka.FirstOffset,
+func NewKafkaConsumer(cfg *config.Config) (*commonkafka.Consumer, error) {
+	return commonkafka.NewConsumer(commonkafka.ConsumerConfig{
+		Brokers:       cfg.Kafka.Brokers,
+		Topic:         cfg.Kafka.Topic,
+		GroupID:       cfg.Kafka.GroupID,
+		InitialOffset: sarama.OffsetOldest,
 	})
 }
 
-func ConsumeStockEvents(reader *kafka.Reader, collection *mongo.Collection, logger *commonlogger.Logger) {
+func ConsumeStockEvents(ctx context.Context, consumer *commonkafka.Consumer, collection *mongo.Collection, logger *commonlogger.Logger) {
 	for {
-		msg, err := reader.ReadMessage(context.Background())
+		err := consumer.Consume(ctx, func(ctx context.Context, msg *sarama.ConsumerMessage) error {
+			var event bson.M
+			if err := json.Unmarshal(msg.Value, &event); err != nil {
+				logger.Error("failed parse kafka message", map[string]interface{}{"error": err.Error()})
+				return nil
+			}
+
+			if _, err := collection.InsertOne(ctx, event); err != nil {
+				logger.Error("mongo insert failed", map[string]interface{}{"error": err.Error(), "event": event})
+				return nil
+			}
+
+			logger.Info("stored stock event", map[string]interface{}{"ticker": event["ticker"], "partition": msg.Partition})
+			return nil
+		})
 		if err != nil {
-			logger.Error("kafka read failed", map[string]interface{}{"error": err.Error()})
+			if ctx.Err() != nil {
+				return
+			}
+			logger.Error("kafka consume error", map[string]interface{}{"error": err.Error()})
 			time.Sleep(2 * time.Second)
-			continue
 		}
-
-		var event bson.M
-		if err := json.Unmarshal(msg.Value, &event); err != nil {
-			logger.Error("failed parse kafka message", map[string]interface{}{"error": err.Error()})
-			continue
-		}
-
-		_, err = collection.InsertOne(context.Background(), event)
-		if err != nil {
-			logger.Error("mongo insert failed", map[string]interface{}{"error": err.Error(), "event": event})
-			continue
-		}
-
-		logger.Info("stored stock event", map[string]interface{}{"ticker": event["ticker"], "partition": msg.Partition})
 	}
 }
