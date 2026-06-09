@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "stock-data-provider-service.fullname" . }}
+  labels:
+    {{- include "stock-data-provider-service.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    server:
+      port: {{ .Values.config.serverPort }}
+    kafka:
+      brokers:
+{{- range .Values.kafka.brokers }}
+        - {{ . | quote }}
+{{- end }}
+      topic: {{ .Values.kafka.topic | quote }}
+      groupId: {{ .Values.kafka.groupId | quote }}
+    mongo:
+      uri: {{ .Values.mongo.uri | quote }}
+      database: {{ .Values.mongo.database | quote }}
+      collection: {{ .Values.mongo.collection | quote }}
+    datadog:
+      apiKey: ""
+      site: {{ .Values.datadog.site | quote }}
+      env: {{ .Values.datadog.env | quote }}
+    tokenAuthorization:
+      jwk_uri: {{ .Values.tokenAuthorization.jwkUri | quote }}
+      validIssuers:
+{{- range .Values.tokenAuthorization.validIssuers }}
+        - {{ . | quote }}
+{{- end }}
+      validAudiences:
+{{- range .Values.tokenAuthorization.validAudiences }}
+        - {{ . | quote }}
+{{- end }}
+      expectedScopes:
+{{- if .Values.tokenAuthorization.expectedScopes }}
+{{ toYaml .Values.tokenAuthorization.expectedScopes | indent 8 }}
+{{- else }}
+        {}
+{{- end }}

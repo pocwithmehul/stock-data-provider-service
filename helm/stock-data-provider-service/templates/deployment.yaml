@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "stock-data-provider-service.fullname" . }}
+  labels:
+    {{- include "stock-data-provider-service.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "stock-data-provider-service.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "stock-data-provider-service.selectorLabels" . | nindent 8 }}
+        tags.datadoghq.com/env: {{ .Values.datadog.env | quote }}
+        tags.datadoghq.com/service: "stock-data-provider-service"
+        tags.datadoghq.com/version: {{ .Values.image.tag | quote }}
+      annotations:
+        ad.datadoghq.com/stock-data-provider-service.logs: '[{"source":"go","service":"stock-data-provider-service"}]'
+    spec:
+      containers:
+        - name: stock-data-provider-service
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: CONFIG_PATH
+              value: /app/config/config.yaml
+            - name: DD_AGENT_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: DD_ENTITY_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+            - name: DD_SERVICE
+              value: "stock-data-provider-service"
+            - name: DD_ENV
+              value: {{ .Values.datadog.env | quote }}
+            - name: DD_VERSION
+              value: {{ .Values.image.tag | quote }}
+            {{- if .Values.datadog.apiKey }}
+            - name: DATADOG_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "stock-data-provider-service.fullname" . }}
+                  key: datadogApiKey
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.config.serverPort }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /app/config
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "stock-data-provider-service.fullname" . }}
