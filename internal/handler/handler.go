@@ -4,24 +4,24 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"strings"
 
+	commonlocale "github.com/pocwithmehul/common-go-lib/pkg/locale"
 	commonlogger "github.com/pocwithmehul/common-go-lib/pkg/logger"
 	commonmiddleware "github.com/pocwithmehul/common-go-lib/pkg/middleware"
 	"github.com/pocwithmehul/stock-data-provider-service/internal/config"
+	"github.com/pocwithmehul/stock-data-provider-service/internal/db"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type StockQueryResponse struct {
 	StockData []bson.M `json:"stockData"`
 }
 
-func GetStockHandler(collection *mongo.Collection, cfg *config.Config, logger *commonlogger.Logger) http.HandlerFunc {
+func GetStockHandler(collectionProvider *db.CollectionProvider, cfg *config.Config, logger *commonlogger.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userInfo, err := commonmiddleware.ParseBearerToken(r, &cfg.TokenAuth)
 		if err != nil {
-			logger.Error("token validation failed", map[string]interface{}{"error": err.Error(), "locale": preferredLocale(r)})
+			logger.Error("token validation failed", map[string]interface{}{"error": err.Error(), "locale": commonlocale.GetPreferredLocale(r)})
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -35,8 +35,14 @@ func GetStockHandler(collection *mongo.Collection, cfg *config.Config, logger *c
 		logger.Info("getstock request", map[string]interface{}{
 			"symbol": symbol,
 			"user":   userInfo,
-			"locale": preferredLocale(r),
+			"locale": commonlocale.GetPreferredLocale(r),
 		})
+
+		collection := collectionProvider.Get()
+		if collection == nil {
+			http.Error(w, "service unavailable", http.StatusServiceUnavailable)
+			return
+		}
 
 		cursor, err := collection.Find(context.Background(), bson.M{"ticker": symbol})
 		if err != nil {
@@ -60,23 +66,4 @@ func GetStockHandler(collection *mongo.Collection, cfg *config.Config, logger *c
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(StockQueryResponse{StockData: results})
 	}
-}
-
-func preferredLocale(r *http.Request) string {
-	accept := r.Header.Get("Accept-Language")
-	if accept == "" {
-		return "en-US"
-	}
-
-	parts := strings.Split(accept, ",")
-	if len(parts) == 0 {
-		return "en-US"
-	}
-
-	locale := strings.TrimSpace(parts[0])
-	if locale == "" {
-		return "en-US"
-	}
-
-	return locale
 }

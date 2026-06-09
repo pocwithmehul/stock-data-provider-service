@@ -1,13 +1,13 @@
-FROM golang:1.26-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 RUN apk add --no-cache git ca-certificates
 WORKDIR /app
 
 COPY ./stock-data-provider-service /app/stock-data-provider-service
-COPY ./common-lib /app/common-lib
+COPY ./common-go-lib /app/common-go-lib
 WORKDIR /app/stock-data-provider-service
 RUN go mod tidy
-RUN go build -o /bin/stock-data-provider-service ./...
+RUN go build -o /bin/stock-data-provider-service .
 
 FROM alpine:3.19
 RUN apk add --no-cache ca-certificates

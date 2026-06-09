@@ -1,0 +1,27 @@
+mongo:
+  enabled: true
+  name: mongo
+  image:
+    repository: mongo
+    tag: "7.0"
+    pullPolicy: IfNotPresent
+  port: 27017
+  storage:
+    enabled: true
+    size: 1Gi
+  resources: {}
+
+kafka:
+  enabled: true
+  name: kafka
+  image:
+    repository: confluentinc/cp-kafka
+    tag: "7.7.1"
+    pullPolicy: IfNotPresent
+  port: 9092
+  controllerPort: 9093
+  clusterId: MkU3OEVBNTcwNTJENDM2Qk
+  storage:
+    enabled: true
+    size: 2Gi
+  resources: {}

@@ -1,0 +1,59 @@
+replicaCount: 1
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: stock-data-provider-service
+  tag: dev
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8082
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: stock-data-provider-service.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+kafka:
+  brokers:
+    - kafka:9092
+  topic: stock-ticker-event
+  groupId: stock-data-provider-group
+
+mongo:
+  uri: mongodb://mongo:27017
+  database: stockdata
+  collection: stockevents
+
+datadog:
+  apiKey: ""
+  site: us5.datadoghq.com
+  env: development
+
+config:
+  serverPort: 8082
+
+tokenAuthorization:
+  jwkUri: ""
+  validIssuers:
+    - login.myorg.com
+  validAudiences:
+    - myorgstockapp
+  expectedScopes: {}
+
+resources: {}
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
